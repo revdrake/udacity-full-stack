@@ -225,8 +225,8 @@ def create_venue_submission():
     # TODO: insert form data as a new Venue record in the db, instead
     # TODO: modify data to be the data object returned from db insertion
     error = False
-    body = {}
-    form = VenueForm()
+    # form = VenueForm()
+    create_venue_form()
     try:
         venue = Venue(
               name = form.name.data
@@ -252,9 +252,14 @@ def create_venue_submission():
 
 @app.route('/venues/<venue_id>', methods=['DELETE'])
 def delete_venue(venue_id):
-  # TODO: Complete this endpoint for taking a venue_id, and using
-  # SQLAlchemy ORM to delete a record. Handle cases where the session commit could fail.
-
+    # TODO: Complete this endpoint for taking a venue_id, and using
+    # SQLAlchemy ORM to delete a record. Handle cases where the session commit could fail.
+    try:
+        Venue.query.filter_by(id=venue_id).delete()
+        db.session.commit()
+        flash('Venue ' + venue_id + ' deleted.'
+    except:
+        db.session.rollback()
   # BONUS CHALLENGE: Implement a button to delete a Venue on a Venue Page, have it so that
   # clicking that button delete it from the db then redirect the user to the homepage
   return None
@@ -433,15 +438,34 @@ def create_artist_form():
 
 @app.route('/artists/create', methods=['POST'])
 def create_artist_submission():
-  # called upon submitting the new artist listing form
-  # TODO: insert form data as a new Venue record in the db, instead
-  # TODO: modify data to be the data object returned from db insertion
-
-  # on successful db insert, flash success
-  flash('Artist ' + request.form['name'] + ' was successfully listed!')
+    # called upon submitting the new artist listing form
+    # TODO: insert form data as a new Venue record in the db, instead
+    # TODO: modify data to be the data object returned from db insertion
+    error = False
+    # form = ArtistForm()
+    create_artist_form()
+    try:
+        artist = Artist(
+              name = form.name.data
+              city = form.city.data
+              state = form.state.data
+              phone = form.phone.data
+              genres = db.Column(db.String(120))
+              image_link = form.image_link.data
+              facebook_link = form.facebook_link.data
+              )
+        db.session.add(venue)
+        db.session.commit()
+        # on successful db insert, flash success
+        flash('Artist ' + request.form['name'] + ' was successfully listed!')
   # TODO: on unsuccessful db insert, flash an error instead.
-  # e.g., flash('An error occurred. Artist ' + data.name + ' could not be listed.')
-  return render_template('pages/home.html')
+    except:
+        error = True
+        db.session.rollback()
+        flash('Something went wrong!')
+    # TODO: on unsuccessful db insert, flash an error instead.
+    # e.g., flash('An error occurred. Artist ' + data.name + ' could not be listed.')
+    return render_template('pages/home.html')
 
 
 #  Shows
@@ -500,9 +524,28 @@ def create_shows():
 def create_show_submission():
   # called to create new shows in the db, upon submitting new show listing form
   # TODO: insert form data as a new Show record in the db, instead
-
-  # on successful db insert, flash success
-  flash('Show was successfully listed!')
+    error = False
+    # form = ArtistForm()
+    create_shows()
+    try:
+        artist = Artist(
+              name = form.name.data
+              city = form.city.data
+              state = form.state.data
+              phone = form.phone.data
+              genres = db.Column(db.String(120))
+              image_link = form.image_link.data
+              facebook_link = form.facebook_link.data
+              )
+        db.session.add(venue)
+        db.session.commit()
+        # on successful db insert, flash success
+        flash('Show was successfully listed!')
+  # TODO: on unsuccessful db insert, flash an error instead.
+    except:
+        error = True
+        db.session.rollback()
+        flash('Something went wrong!')
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Show could not be listed.')
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
