@@ -217,8 +217,8 @@ def show_venue(venue_id):
 
 @app.route('/venues/create', methods=['GET'])
 def create_venue_form():
-  form = VenueForm()
-  return render_template('forms/new_venue.html', form=form)
+    form = VenueForm()
+    return render_template('forms/new_venue.html', form=form)
 
 @app.route('/venues/create', methods=['POST'])
 def create_venue_submission():
@@ -229,12 +229,12 @@ def create_venue_submission():
     create_venue_form()
     try:
         venue = Venue(
-              name = form.name.data
-              city = form.city.data
-              state = form.state.data
-              address = form.address.data
-              phone = form.phone.data
-              image_link = form.image_link.data
+              name = form.name.data,
+              city = form.city.data,
+              state = form.state.data,
+              address = form.address.data,
+              phone = form.phone.data,
+              image_link = form.image_link.data,
               facebook_link = form.facebook_link.data
               )
         db.session.add(venue)
@@ -246,9 +246,9 @@ def create_venue_submission():
         error = True
         db.session.rollback()
         flash('Something went wrong!')
-  # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
-  # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
-  return render_template('pages/home.html')
+    # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
+    # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
+    return render_template('pages/home.html')
 
 @app.route('/venues/<venue_id>', methods=['DELETE'])
 def delete_venue(venue_id):
@@ -257,12 +257,12 @@ def delete_venue(venue_id):
     try:
         Venue.query.filter_by(id=venue_id).delete()
         db.session.commit()
-        flash('Venue ' + venue_id + ' deleted.'
+        flash('Venue ' + venue_id + ' deleted.')
     except:
         db.session.rollback()
-  # BONUS CHALLENGE: Implement a button to delete a Venue on a Venue Page, have it so that
-  # clicking that button delete it from the db then redirect the user to the homepage
-  return None
+    # BONUS CHALLENGE: Implement a button to delete a Venue on a Venue Page, have it so that
+    # clicking that button delete it from the db then redirect the user to the homepage
+    return None
 
 #  Artists
 #  ----------------------------------------------------------------
@@ -446,12 +446,12 @@ def create_artist_submission():
     create_artist_form()
     try:
         artist = Artist(
-              name = form.name.data
-              city = form.city.data
-              state = form.state.data
-              phone = form.phone.data
-              genres = db.Column(db.String(120))
-              image_link = form.image_link.data
+              name = form.name.data,
+              city = form.city.data,
+              state = form.state.data,
+              phone = form.phone.data,
+              genres = db.Column(db.String(120)),
+              image_link = form.image_link.data,
               facebook_link = form.facebook_link.data
               )
         db.session.add(venue)
@@ -524,28 +524,6 @@ def create_shows():
 def create_show_submission():
   # called to create new shows in the db, upon submitting new show listing form
   # TODO: insert form data as a new Show record in the db, instead
-    error = False
-    # form = ArtistForm()
-    create_shows()
-    try:
-        artist = Artist(
-              name = form.name.data
-              city = form.city.data
-              state = form.state.data
-              phone = form.phone.data
-              genres = db.Column(db.String(120))
-              image_link = form.image_link.data
-              facebook_link = form.facebook_link.data
-              )
-        db.session.add(venue)
-        db.session.commit()
-        # on successful db insert, flash success
-        flash('Show was successfully listed!')
-  # TODO: on unsuccessful db insert, flash an error instead.
-    except:
-        error = True
-        db.session.rollback()
-        flash('Something went wrong!')
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Show could not be listed.')
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
