@@ -11,6 +11,7 @@ from flask_sqlalchemy import SQLAlchemy
 import logging
 from logging import Formatter, FileHandler
 from flask_wtf import Form
+from flask_migrate import Migrate
 from forms import *
 #----------------------------------------------------------------------------#
 # App Config.
@@ -19,13 +20,15 @@ from forms import *
 app = Flask(__name__)
 moment = Moment(app)
 app.config.from_object('config')
-db = SQLAlchemy(app)
 
 # TODO: connect to a local postgresql database
+db = SQLAlchemy(app, session_options={"expire_on_commit": False})
 
+migrate = Migrate(app, db)
 #----------------------------------------------------------------------------#
 # Models.
 #----------------------------------------------------------------------------#
+
 
 class Venue(db.Model):
     __tablename__ = 'Venue'
@@ -219,12 +222,30 @@ def create_venue_form():
 
 @app.route('/venues/create', methods=['POST'])
 def create_venue_submission():
-  # TODO: insert form data as a new Venue record in the db, instead
-  # TODO: modify data to be the data object returned from db insertion
-
-  # on successful db insert, flash success
-  flash('Venue ' + request.form['name'] + ' was successfully listed!')
+    # TODO: insert form data as a new Venue record in the db, instead
+    # TODO: modify data to be the data object returned from db insertion
+    error = False
+    body = {}
+    form = VenueForm()
+    try:
+        venue = Venue(
+              name = form.name.data
+              city = form.city.data
+              state = form.state.data
+              address = form.address.data
+              phone = form.phone.data
+              image_link = form.image_link.data
+              facebook_link = form.facebook_link.data
+              )
+        db.session.add(venue)
+        db.session.commit()
+        # on successful db insert, flash success
+        flash('Venue ' + request.form['name'] + ' was successfully listed!')
   # TODO: on unsuccessful db insert, flash an error instead.
+    except:
+        error = True
+        db.session.rollback()
+        flash('Something went wrong!')
   # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
   return render_template('pages/home.html')
