@@ -56,9 +56,14 @@ class Artist(db.Model):
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
 
-    # TODO: implement any missing fields, as a database migration using Flask-Migrate
-
+# TODO: implement any missing fields, as a database migration using Flask-Migrate
 # TODO Implement Show and Artist models, and complete all model relationships and properties, as a database migration.
+class Show(db.Model):
+    __tablename__ = 'Show'
+    id = db.Column(db.Integer, primary_key=True)
+    venue_id = db.Column(db.Integer, nullable=False)
+    artist_id = db.Column(db.Integer, nullable=False)
+    start_time = db.Column(db.DateTime, nullable=False)
 
 #----------------------------------------------------------------------------#
 # Filters.
@@ -225,8 +230,7 @@ def create_venue_submission():
     # TODO: insert form data as a new Venue record in the db, instead
     # TODO: modify data to be the data object returned from db insertion
     error = False
-    # form = VenueForm()
-    create_venue_form()
+    form = VenueForm()
     try:
         venue = Venue(
               name = form.name.data,
@@ -245,9 +249,12 @@ def create_venue_submission():
     except:
         error = True
         db.session.rollback()
-        flash('Something went wrong!')
+        flash('An error occurred. Venue ' + request.form['name'] + ' could not be listed.')
     # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
     # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
+    finally:
+        db.session.close()
+
     return render_template('pages/home.html')
 
 @app.route('/venues/<venue_id>', methods=['DELETE'])
@@ -442,19 +449,18 @@ def create_artist_submission():
     # TODO: insert form data as a new Venue record in the db, instead
     # TODO: modify data to be the data object returned from db insertion
     error = False
-    # form = ArtistForm()
-    create_artist_form()
+    form = ArtistForm()
     try:
         artist = Artist(
               name = form.name.data,
               city = form.city.data,
               state = form.state.data,
               phone = form.phone.data,
-              genres = db.Column(db.String(120)),
+              genres = form.genres.data,
               image_link = form.image_link.data,
               facebook_link = form.facebook_link.data
               )
-        db.session.add(venue)
+        db.session.add(artist)
         db.session.commit()
         # on successful db insert, flash success
         flash('Artist ' + request.form['name'] + ' was successfully listed!')
@@ -462,9 +468,11 @@ def create_artist_submission():
     except:
         error = True
         db.session.rollback()
-        flash('Something went wrong!')
+        flash('Artist ' + request.form['name'] + ' could not be listed.')
     # TODO: on unsuccessful db insert, flash an error instead.
     # e.g., flash('An error occurred. Artist ' + data.name + ' could not be listed.')
+    finally:
+        db.session.close()
     return render_template('pages/home.html')
 
 
@@ -527,6 +535,28 @@ def create_show_submission():
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Show could not be listed.')
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
+  error = False
+  form = ShowForm()
+  try:
+      show = Show(
+            venue_id = form.venue_id.data,
+            artist_id = form.artist_id.data,
+            start_time = form.start_time.data
+            )
+      db.session.add(show)
+      db.session.commit()
+      # on successful db insert, flash success
+      flash('Show was successfully listed!')
+# TODO: on unsuccessful db insert, flash an error instead.
+  except:
+      error = True
+      db.session.rollback()
+      flash('Show could not be listed.')
+  # TODO: on unsuccessful db insert, flash an error instead.
+  # e.g., flash('An error occurred. Artist ' + data.name + ' could not be listed.')
+  finally:
+      db.session.close()
+
   return render_template('pages/home.html')
 
 @app.errorhandler(404)
