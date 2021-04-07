@@ -10,7 +10,8 @@ from flask_moment import Moment
 from flask_sqlalchemy import SQLAlchemy
 import logging
 from logging import Formatter, FileHandler
-from flask_wtf import Form
+# from flask_wtf import Form
+from flask_wtf import FlaskForm
 from flask_migrate import Migrate
 from forms import *
 #----------------------------------------------------------------------------#
@@ -40,7 +41,11 @@ class Venue(db.Model):
     address = db.Column(db.String(120))
     phone = db.Column(db.String(120))
     image_link = db.Column(db.String(500))
+    # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    # I think this should change to an uploaded image .
+    # This would be much easier to store and could allow them to choose.
     facebook_link = db.Column(db.String(120))
+    # website_link = db.Column(db.String(120))
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
@@ -52,9 +57,11 @@ class Artist(db.Model):
     city = db.Column(db.String(120))
     state = db.Column(db.String(120))
     phone = db.Column(db.String(120))
-    genres = db.Column(db.String(120))
+    # genres = db.Column(db.String(120))
+    genres = db.Column(db.ARRAY(db.Text), default=[])
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
+    # website_link = db.Column(db.String(120))
 
 # TODO: implement any missing fields, as a database migration using Flask-Migrate
 # TODO Implement Show and Artist models, and complete all model relationships and properties, as a database migration.
@@ -378,7 +385,90 @@ def show_artist(artist_id):
     "past_shows_count": 0,
     "upcoming_shows_count": 3,
   }
-  data = list(filter(lambda d: d['id'] == artist_id, [data1, data2, data3]))[0]
+  # data = list(filter(lambda d: d['id'] == artist_id, [data1, data2, data3]))[0]
+  # data = [data1,data2,data3]
+  #
+  #
+  artist_data_query = """
+        select
+          a.id
+        , a.name
+        , a.genres
+        , a.city
+        , a.state
+        , a.phone
+        , false as seeking_venue
+        , null as image_link
+        , coalesce(json_agg( json_build_object('venue_id', v.id,
+                                      'venue_name', v.name,
+                                      'venue_image_link', v.image_link,
+                                      'start_time', s.start_time::text)
+                   ) filter ( where s.start_time::timestamp < now() ), '[]') as past_shows
+        , coalesce(json_agg( json_build_object('venue_id', v.id,
+                                      'venue_name', v.name,
+                                      'venue_image_link', v.image_link,
+                                      'start_time', s.start_time::text)
+                  ) filter ( where s.start_time::timestamp >= now() ), '[]') as upcoming_shows
+        , count(1) filter ( where s.start_time::timestamp < now() ) as past_shows_count
+        , count(1) filter ( where s.start_time::timestamp >= now() ) as upcoming_shows_count
+        from "Artist" a
+        left join "Show" s on s.artist_id = a.id
+        left join "Venue" v on v.id = s.venue_id
+        where true
+          and a.id = {artist_id}
+        group by a.id
+        limit 1
+  """.format(artist_id=artist_id)
+
+  artist_data_query_results = db.session.execute(artist_data_query)
+
+  # artist = artist_data_query_results
+
+  artists = [{
+          "id": artist.id,
+          "name": artist.name,
+          "genres": artist.genres,
+          "city": artist.city,
+          "state": artist.state,
+          "phone": artist.phone,
+          "seeking_venue": artist.seeking_venue,
+          "image_link": artist.image_link,
+          "past_shows": artist.past_shows,
+          "upcoming_shows": artist.upcoming_shows,
+          "past_shows_count": artist.past_shows_count,
+          "upcoming_shows_count": artist.upcoming_shows_count
+      } for artist in artist_data_query_results][0]
+    # ]
+  #
+  data = [data1, data2, data3, artists]
+
+  # data += artists
+  #
+  data = list(filter(lambda d: d['id'] == artist_id, data))[0]
+
+
+  #
+  # print(artists)
+  #
+  # for d in data:
+  #     for key in d.keys():
+  #         print(key + ': ', d[key])
+  #     print('next artist')
+
+  # for d in data:
+  #     print(d)
+  #
+  # print('ARTISTS')
+  #
+  # for a in artists:
+  #     print(a)
+
+  print("DATA")
+  print(data)
+  print("\n")
+  print("ARTIST")
+  print(artists)
+
   return render_template('pages/show_artist.html', artist=data)
 
 #  Update
@@ -520,6 +610,37 @@ def shows():
     "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
     "start_time": "2035-04-15T20:00:00.000Z"
   }]
+
+  shows_query = """
+        select
+          s.venue_id
+        , v.name as venue_name
+        , s.artist_id
+        , a.name as artist_name
+        , a.image_link as artist_image_link
+        , s.start_time::text as start_time
+        from "Show" s
+        join "Venue" v on v.id = s.venue_id
+        join "Artist" a on a.id = s.artist_id
+        where true
+        ;
+  """
+
+  shows = db.session.execute(shows_query)
+
+  shows_list = [
+    {
+        "venue_id": show.venue_id,
+        "venue_name": show.venue_name,
+        "artist_id": show.artist_id,
+        "artist_name": show.artist_name,
+        "artist_image_link": show.artist_image_link,
+        "start_time": show.start_time
+    } for show in shows
+  ]
+
+  data += shows_list
+
   return render_template('pages/shows.html', shows=data)
 
 @app.route('/shows/create')
