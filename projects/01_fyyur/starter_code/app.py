@@ -45,9 +45,11 @@ class Venue(db.Model):
     # I think this should change to an uploaded image .
     # This would be much easier to store and could allow them to choose.
     facebook_link = db.Column(db.String(120))
-    # website_link = db.Column(db.String(120))
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
+    # website_link = db.Column(db.String(120)) # add in
+    # seeking_talent = db.Column(db.Boolean) # add in
+    # genres = db.Column(db.String(120))
 
 class Artist(db.Model):
     __tablename__ = 'Artist'
@@ -57,10 +59,11 @@ class Artist(db.Model):
     city = db.Column(db.String(120))
     state = db.Column(db.String(120))
     phone = db.Column(db.String(120))
-    # genres = db.Column(db.String(120))
-    genres = db.Column(db.ARRAY(db.Text), default=[])
+    genres = db.Column(db.String(120))
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
+
+    # ADD IN
     # website_link = db.Column(db.String(120))
 
 # TODO: implement any missing fields, as a database migration using Flask-Migrate
@@ -100,9 +103,9 @@ def index():
 
 @app.route('/venues')
 def venues():
-  # TODO: replace with real venues data.
-  #       num_shows should be aggregated based on number of upcoming shows per venue.
-  data=[{
+    # TODO: replace with real venues data.
+    #       num_shows should be aggregated based on number of upcoming shows per venue.
+    data=[{
     "city": "San Francisco",
     "state": "CA",
     "venues": [{
@@ -114,7 +117,7 @@ def venues():
       "name": "Park Square Live Music & Coffee",
       "num_upcoming_shows": 1,
     }]
-  }, {
+    }, {
     "city": "New York",
     "state": "NY",
     "venues": [{
@@ -122,8 +125,40 @@ def venues():
       "name": "The Dueling Pianos Bar",
       "num_upcoming_shows": 0,
     }]
-  }]
-  return render_template('pages/venues.html', areas=data);
+    }]
+
+    venues_query = """
+          select
+            v.city
+          , v.state
+          , json_agg(
+                json_build_object('id', v.id::text,
+                                  'name', v.name::text,
+                                  'num_upcoming_shows', ucs.num_upcoming_shows::text)
+                    ) as "venues"
+          from "Venue" v
+          left join lateral (select count(1) as num_upcoming_shows
+                             from "Show" s
+                             where s.venue_id = v.id
+                               and s.start_time > now()::timestamp) ucs on true
+          where true
+          group by 1,2
+          ;
+          """
+
+    venues_query_results = db.session.execute(venues_query)
+
+    venues = [{
+        "city": venue.city,
+        "state": venue.state,
+        "venues": venue.venues
+    } for venue in venues_query_results]
+
+    data += venues
+
+    db.session.close()
+
+    return render_template('pages/venues.html', areas=data)
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
@@ -142,9 +177,9 @@ def search_venues():
 
 @app.route('/venues/<int:venue_id>')
 def show_venue(venue_id):
-  # shows the venue page with the given venue_id
-  # TODO: replace with real venue data from the venues table, using venue_id
-  data1={
+    # shows the venue page with the given venue_id
+    # TODO: replace with real venue data from the venues table, using venue_id
+    data1={
     "id": 1,
     "name": "The Musical Hop",
     "genres": ["Jazz", "Reggae", "Swing", "Classical", "Folk"],
@@ -166,8 +201,8 @@ def show_venue(venue_id):
     "upcoming_shows": [],
     "past_shows_count": 1,
     "upcoming_shows_count": 0,
-  }
-  data2={
+    }
+    data2={
     "id": 2,
     "name": "The Dueling Pianos Bar",
     "genres": ["Classical", "R&B", "Hip-Hop"],
@@ -183,8 +218,8 @@ def show_venue(venue_id):
     "upcoming_shows": [],
     "past_shows_count": 0,
     "upcoming_shows_count": 0,
-  }
-  data3={
+    }
+    data3={
     "id": 3,
     "name": "Park Square Live Music & Coffee",
     "genres": ["Rock n Roll", "Jazz", "Classical", "Folk"],
@@ -220,9 +255,79 @@ def show_venue(venue_id):
     }],
     "past_shows_count": 1,
     "upcoming_shows_count": 1,
-  }
-  data = list(filter(lambda d: d['id'] == venue_id, [data1, data2, data3]))[0]
-  return render_template('pages/show_venue.html', venue=data)
+    }
+
+
+    venue_data_query = """
+        select
+          v.id
+        , v.name
+        , '{{}}'::text[] as genres
+        , v.address
+        , v.city
+        , v.state
+        , v.phone
+        , 'www.something.com' as website_link -- add into model
+        , v.facebook_link
+        , False as seeking_talent -- add into model
+        , v.image_link
+        , json_agg(
+              json_build_object('artist_id', s.artist_id,
+                                'artist_name', a.name,
+                                'artist_image_link', a.image_link,
+                                'start_time', s.start_time)
+              ) filter (where s.start_time <= now()::timestamp) as past_shows
+        , json_agg(
+              json_build_object('artist_id', s.artist_id,
+                                'artist_name', a.name,
+                                'artist_image_link', a.image_link,
+                                'start_time', s.start_time)
+              ) filter (where s.start_time > now()::timestamp) as upcoming_shows
+        , count(s.id) filter (where s.start_time <= now()::timestamp) as past_shows_count
+        , count(s.id) filter (where s.start_time > now()::timestamp) as upcoming_shows_count
+        from "Venue" v
+        left join "Show" s on s.venue_id = v.id
+        left join "Artist" a on a.id = s.artist_id
+        where true
+          and v.id = {venue_id}
+        group by v.id
+        limit 1
+        ;
+    """.format(venue_id=venue_id)
+
+    venue_data_query_results = db.session.execute(venue_data_query)
+
+    # artist = artist_data_query_results
+
+    venues = [{
+            "id": venue.id,
+            "name": venue.name,
+            "genres": venue.genres,
+            "address": venue.address,
+            "city": venue.city,
+            "state": venue.state,
+            "phone": venue.phone,
+            "website_link": venue.website_link,
+            "facebook_link": venue.facebook_link,
+            "seeking_talent": venue.seeking_talent,
+            "image_link": venue.image_link,
+            "past_shows": venue.past_shows,
+            "upcoming_shows": venue.upcoming_shows,
+            "past_shows_count": venue.past_shows_count,
+            "upcoming_shows_count": venue.upcoming_shows_count
+        } for venue in venue_data_query_results]
+
+    data = [data1, data2, data3]
+
+    for v in venues:
+        data.append(v)
+
+    for d in data:
+        if d['id'] == venue_id:
+            data = d
+            break
+
+    return render_template('pages/show_venue.html', venue=data)
 
 #  Create Venue
 #  ----------------------------------------------------------------
@@ -282,18 +387,38 @@ def delete_venue(venue_id):
 #  ----------------------------------------------------------------
 @app.route('/artists')
 def artists():
-  # TODO: replace with real data returned from querying the database
-  data=[{
+    # TODO: replace with real data returned from querying the database
+    data=[{
     "id": 4,
     "name": "Guns N Petals",
-  }, {
+    }, {
     "id": 5,
     "name": "Matt Quevedo",
-  }, {
+    }, {
     "id": 6,
     "name": "The Wild Sax Band",
-  }]
-  return render_template('pages/artists.html', artists=data)
+    }]
+
+    artists_query = """
+          select
+            a.id
+          , a.name
+          from "Artist" a
+          where true
+          ;
+          """
+
+    artists_query_results = db.session.execute(artists_query)
+
+
+    artists = [{
+        "id": artist.id,
+        "name": artist.name,
+    } for artist in artists_query_results]
+
+    data += artists
+
+    return render_template('pages/artists.html', artists=data)
 
 @app.route('/artists/search', methods=['POST'])
 def search_artists():
@@ -385,15 +510,12 @@ def show_artist(artist_id):
     "past_shows_count": 0,
     "upcoming_shows_count": 3,
   }
-  # data = list(filter(lambda d: d['id'] == artist_id, [data1, data2, data3]))[0]
-  # data = [data1,data2,data3]
-  #
-  #
+
   artist_data_query = """
         select
           a.id
         , a.name
-        , a.genres
+        , a.genres::text[] genres
         , a.city
         , a.state
         , a.phone
@@ -418,6 +540,7 @@ def show_artist(artist_id):
           and a.id = {artist_id}
         group by a.id
         limit 1
+        ;
   """.format(artist_id=artist_id)
 
   artist_data_query_results = db.session.execute(artist_data_query)
@@ -437,37 +560,18 @@ def show_artist(artist_id):
           "upcoming_shows": artist.upcoming_shows,
           "past_shows_count": artist.past_shows_count,
           "upcoming_shows_count": artist.upcoming_shows_count
-      } for artist in artist_data_query_results][0]
+      } for artist in artist_data_query_results]
     # ]
   #
-  data = [data1, data2, data3, artists]
+  data = [data1, data2, data3]
 
-  # data += artists
-  #
-  data = list(filter(lambda d: d['id'] == artist_id, data))[0]
+  for a in artists:
+      data.append(a)
 
-
-  #
-  # print(artists)
-  #
-  # for d in data:
-  #     for key in d.keys():
-  #         print(key + ': ', d[key])
-  #     print('next artist')
-
-  # for d in data:
-  #     print(d)
-  #
-  # print('ARTISTS')
-  #
-  # for a in artists:
-  #     print(a)
-
-  print("DATA")
-  print(data)
-  print("\n")
-  print("ARTIST")
-  print(artists)
+  for d in data:
+      if d['id'] == artist_id:
+          data = d
+          break
 
   return render_template('pages/show_artist.html', artist=data)
 
@@ -475,8 +579,8 @@ def show_artist(artist_id):
 #  ----------------------------------------------------------------
 @app.route('/artists/<int:artist_id>/edit', methods=['GET'])
 def edit_artist(artist_id):
-  form = ArtistForm()
-  artist={
+    form = ArtistForm()
+    artist={
     "id": 4,
     "name": "Guns N Petals",
     "genres": ["Rock n Roll"],
@@ -488,9 +592,67 @@ def edit_artist(artist_id):
     "seeking_venue": True,
     "seeking_description": "Looking for shows to perform at in the San Francisco Bay Area!",
     "image_link": "https://images.unsplash.com/photo-1549213783-8284d0336c4f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=300&q=80"
-  }
-  # TODO: populate form with fields from artist with ID <artist_id>
-  return render_template('forms/edit_artist.html', form=form, artist=artist)
+    }
+    # TODO: populate form with fields from artist with ID <artist_id>
+    artist_data_query = """
+        select
+          a.id
+        , a.name
+        , a.genres::text[] genres
+        , a.city
+        , a.state
+        , a.phone
+        , false as seeking_venue
+        , null as image_link
+        , coalesce(json_agg( json_build_object('venue_id', v.id,
+                                      'venue_name', v.name,
+                                      'venue_image_link', v.image_link,
+                                      'start_time', s.start_time::text)
+                   ) filter ( where s.start_time::timestamp < now() ), '[]') as past_shows
+        , coalesce(json_agg( json_build_object('venue_id', v.id,
+                                      'venue_name', v.name,
+                                      'venue_image_link', v.image_link,
+                                      'start_time', s.start_time::text)
+                  ) filter ( where s.start_time::timestamp >= now() ), '[]') as upcoming_shows
+        , count(1) filter ( where s.start_time::timestamp < now() ) as past_shows_count
+        , count(1) filter ( where s.start_time::timestamp >= now() ) as upcoming_shows_count
+        from "Artist" a
+        left join "Show" s on s.artist_id = a.id
+        left join "Venue" v on v.id = s.venue_id
+        where true
+          and a.id = {artist_id}
+        group by a.id
+        limit 1
+        ;
+    """.format(artist_id=artist_id)
+
+    artist_data_query_results = db.session.execute(artist_data_query)
+
+    artists = [{
+          "id": artist.id,
+          "name": artist.name,
+          "genres": artist.genres,
+          "city": artist.city,
+          "state": artist.state,
+          "phone": artist.phone,
+          "seeking_venue": artist.seeking_venue,
+          "image_link": artist.image_link,
+          "past_shows": artist.past_shows,
+          "upcoming_shows": artist.upcoming_shows,
+          "past_shows_count": artist.past_shows_count,
+          "upcoming_shows_count": artist.upcoming_shows_count
+      } for artist in artist_data_query_results]
+
+    data = list(artist)
+
+    data += artists
+
+    for d in data:
+      if d['id'] == artist_id:
+          data = d
+          break
+
+      return render_template('forms/edit_artist.html', form=form, artist=artist)
 
 @app.route('/artists/<int:artist_id>/edit', methods=['POST'])
 def edit_artist_submission(artist_id):
@@ -501,8 +663,8 @@ def edit_artist_submission(artist_id):
 
 @app.route('/venues/<int:venue_id>/edit', methods=['GET'])
 def edit_venue(venue_id):
-  form = VenueForm()
-  venue={
+    form = VenueForm()
+    venue={
     "id": 1,
     "name": "The Musical Hop",
     "genres": ["Jazz", "Reggae", "Swing", "Classical", "Folk"],
@@ -515,9 +677,11 @@ def edit_venue(venue_id):
     "seeking_talent": True,
     "seeking_description": "We are on the lookout for a local artist to play every two weeks. Please call us.",
     "image_link": "https://images.unsplash.com/photo-1543900694-133f37abaaa5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60"
-  }
-  # TODO: populate form with values from venue with ID <venue_id>
-  return render_template('forms/edit_venue.html', form=form, venue=venue)
+    }
+    # TODO: populate form with values from venue with ID <venue_id>
+
+
+    return render_template('forms/edit_venue.html', form=form, venue=venue)
 
 @app.route('/venues/<int:venue_id>/edit', methods=['POST'])
 def edit_venue_submission(venue_id):
@@ -638,6 +802,8 @@ def shows():
         "start_time": show.start_time
     } for show in shows
   ]
+
+  print(shows_list)
 
   data += shows_list
 
