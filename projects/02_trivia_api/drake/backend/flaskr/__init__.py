@@ -134,21 +134,23 @@ def create_app(test_config=None):
     This removal will persist in the database and when you refresh the page.
     '''
 
-    @app.route('/questions/<int:question_id>', methods=['GET'])
+    @app.route('/questions/<int:question_id>', methods=['DELETE'])
     def delete_question(question_id):
-        question = Question.query.get(question_id)
+        try:
+            question = Question.query.get(question_id)
 
-        if question is None:
-            abort(404)
+            if question is None:
+                abort(404)
 
-        question.delete()
+            question.delete()
 
-        selection = Question.query.order_by(Question.id).all()
-        return jsonify({
-            'success': True,
-            'deleted': question_id,
-            'total_questions': len(selection)
-        })
+            selection = Question.query.order_by(Question.id).all()
+            return jsonify({
+                'success': True,
+                'deleted': question_id
+            })
+        except:
+            abort(422)
 
 
 
@@ -164,27 +166,56 @@ def create_app(test_config=None):
     '''
 
     @app.route('/questions', methods=['POST']) # change to /add route
-    def create_question():
+    def add_question():
         body = request.get_json()
         question = body.get('question', None)
         answer = body.get('answer', None)
-        category = body.get('category', None)
         difficulty = body.get('difficulty', None)
+        category = body.get('category', None)
+        search_term = body.get('searchTerm', None)
 
-        # selection = Question.query.order_by(Question.id).all()
+        # search
+        if search_term is not None:
+            selection = Question.query.filter(Question.question.ilike(f'%{search_term}%')).all()
 
-        # current_questions = paginate_questions(request, selection)
+            if len(selection)==0:
+                abort(404)
 
-        # categories = Category.query.order_by(Category.id).all()
+            current_questions = paginate_questions(request, selection)
 
+            return jsonify({
+                'success': True,
+                'questions': current_questions,
+                'total_questions': len(Question.query.all())
+            })
+        # add new question
+        else:
+            if any(v is None for v in [question, answer, difficulty, category]):
+                abort(422)
 
+            try:
+                question = Question(
+                    question = question,
+                    answer = answer,
+                    difficulty = difficulty,
+                    category = category
+                )
 
-        return jsonify({
-            'success': True,
-            'question': current_questions,
-            'total_questions': len(selection),
-            'categories': get_categories_dict(categories)
-        })
+                question.insert()
+
+                selection = Question.query.order_by(Question.id).all()
+                current_questions = paginate_questions(request, selection)
+
+                return jsonify({
+                    'success': True,
+                    'questions': current_questions,
+                    'total_questions': len(selection)
+                })
+
+                # flash('Your question was successfully added. \n Thank you for you input!')
+
+            except:
+                abort(422)
 
     '''
     @TODO:
@@ -204,6 +235,9 @@ def create_app(test_config=None):
 
         if search_term is not None:
             selection = Question.query.order_by(Question.id).filter(Question.question.ilike(f'%{search_term}%')).all()
+
+            if len(select==0):
+                abort(404)
 
             current_questions = paginate_questions(request, selection)
 
@@ -251,8 +285,47 @@ def create_app(test_config=None):
     '''
 
     # @app.route('/quizzes', methods=['POST'])
-    # def get_quiz():
+    # def get_quiz_questions():
     #     body = request.get_json()
+    #     previous_questions = body.get('previous_questions', None)
+    #     quiz_category = body.get('quiz_category')
+    #
+    #     if any(v is None for v in [previous_questions, quiz_category]):
+    #         abort(400)
+    #
+    #     if quiz_category.id == 0:
+    #         questions = Question.query.all()
+    #     else:
+    #         questions = Question.query.filter_by(category=category.id).all()
+    #
+    #     total_questions = len(questions)
+    #
+    #     def get_random_quiz_questions():
+    #         questions[random.randrange(0, len(questions), 1)]
+    #
+    #     def check_if_previously_seen():
+    #         previously_seen = False
+    #
+    #         for q in previous_questions:
+    #             if q == question.id:
+    #                 True
+    #
+    #         return previously_seen
+    #
+    #     question = get_random_quiz_questions()
+    #
+    #     while check_if_previously_seen(question):
+    #         question = get_random_quiz_questions()
+    #
+    #         if len(previous_questions == total_questions):
+    #             return jsonify({
+    #                 'success': True
+    #             })
+    #
+    #     return jsonify({
+    #         'success': True,
+    #         'question': question.format()
+    #     })
 
     '''
     @TODO:
